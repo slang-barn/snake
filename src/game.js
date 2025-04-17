@@ -17,6 +17,15 @@ export class Game {
   gamePaused = false;
   isGameOver = false; // Flag to indicate game over state
   wasPausedBeforeSettings = false; // Track if game was paused before opening settings
+  snakeColor = '#2ecc71'; // Default snake color
+  colorPalette = {
+    '经典绿': '#2ecc71',
+    '皓月白': '#F5F5F7',
+    '土豪金': '#DAA520',
+    '深空灰': '#5A5A5A',
+    '远峰蓝': '#A7C7E7',
+    '星光色': '#F0EBE3'
+  };
 
   constructor(ctx, width, height, scoreElement) {
     this.ctx = ctx;
@@ -37,6 +46,7 @@ export class Game {
     };
     this.gameSpeed = this.speedMap.normal;
 
+    this.loadSettings(); // Load settings first
     this.reset();
     this.setupInput();
     this.setupSettings();
@@ -55,6 +65,8 @@ export class Game {
     this.score = 0;
     this.updateScoreDisplay();
     this.spawnFood();
+    // Apply loaded color on reset
+    // this.ctx.fillStyle = this.snakeColor; // Color applied during draw
   }
 
   setupInput() {
@@ -183,8 +195,8 @@ export class Game {
     const cols = Math.floor(this.width / this.gridSize);
     const rows = Math.floor(this.height / this.gridSize);
     const cellSize = Math.min(this.width / cols, this.height / rows);
-    // Clear canvas
-    this.ctx.fillStyle = '#eee';
+    // Clear canvas with a slightly off-white color
+    this.ctx.fillStyle = '#f9f9f9'; // Use a light background that contrasts well with white/starlight
     this.ctx.fillRect(0, 0, this.width, this.height);
 
     // 绘制网格
@@ -210,52 +222,73 @@ export class Game {
     }
 
     // Draw snake
-    this.snake.forEach((segment, idx) => {
-      const grad = this.ctx.createLinearGradient(segment.x, segment.y, segment.x + cellSize, segment.y + cellSize);
-      grad.addColorStop(0, '#a8e063');
-      grad.addColorStop(1, '#56ab2f');
-      this.ctx.save();
-      this.ctx.shadowColor = 'rgba(80,180,80,0.35)';
-      this.ctx.shadowBlur = 8;
-      this.ctx.fillStyle = grad;
-      this.ctx.beginPath();
-      this.ctx.moveTo(segment.x + 4, segment.y);
-      this.ctx.arcTo(segment.x + cellSize, segment.y, segment.x + cellSize, segment.y + cellSize, 6);
-      this.ctx.arcTo(segment.x + cellSize, segment.y + cellSize, segment.x, segment.y + cellSize, 6);
-      this.ctx.arcTo(segment.x, segment.y + cellSize, segment.x, segment.y, 6);
-      this.ctx.arcTo(segment.x, segment.y, segment.x + cellSize, segment.y, 6);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.shadowBlur = 0;
-      this.ctx.restore();
-      this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-      this.ctx.lineWidth = 1.2;
-      this.ctx.stroke();
+    // Use the selected snake color
+    this.snake.forEach((segment, index) => {
+      const isHead = index === 0;
+      const segmentColor = isHead ? this.adjustColor(this.snakeColor, -20) : this.snakeColor;
+
+      this.ctx.fillStyle = segmentColor;
+      this.ctx.fillRect(segment.x, segment.y, this.gridSize, this.gridSize);
+
+      // Optional: Add a subtle border to snake segments for better visibility on similar backgrounds
+      // Adjust border based on snake color brightness for contrast
+      const brightness = this.getColorBrightness(segmentColor);
+      this.ctx.strokeStyle = brightness > 128 ? '#555' : '#ccc'; // Dark border for light colors, light for dark
+      this.ctx.lineWidth = 0.5;
+      this.ctx.strokeRect(segment.x, segment.y, this.gridSize, this.gridSize);
     });
 
     // Draw food
-    this.ctx.save();
-    this.ctx.shadowColor = 'rgba(200,0,40,0.35)';
-    this.ctx.shadowBlur = 10;
-    const foodCenterX = this.food.x + cellSize / 2;
-    const foodCenterY = this.food.y + cellSize / 2;
-    const foodRadius = cellSize * 0.45;
-    const foodGrad = this.ctx.createRadialGradient(foodCenterX, foodCenterY, foodRadius * 0.3, foodCenterX, foodCenterY, foodRadius);
-    foodGrad.addColorStop(0, '#ff6a6a');
-    foodGrad.addColorStop(1, '#b31217');
-    this.ctx.fillStyle = foodGrad;
+    this.ctx.fillStyle = '#e74c3c'; // Food color
     this.ctx.beginPath();
-    this.ctx.arc(foodCenterX, foodCenterY, foodRadius, 0, Math.PI * 2);
-    this.ctx.closePath();
+    this.ctx.arc(this.food.x + this.gridSize / 2, this.food.y + this.gridSize / 2, this.gridSize / 2.2, 0, Math.PI * 2);
     this.ctx.fill();
-    this.ctx.globalAlpha = 0.5;
+    // Optional: Add a small highlight to the food
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
     this.ctx.beginPath();
-    this.ctx.arc(foodCenterX - foodRadius * 0.3, foodCenterY - foodRadius * 0.3, foodRadius * 0.35, 0, Math.PI * 2);
-    this.ctx.closePath();
-    this.ctx.fillStyle = '#fff';
+    this.ctx.arc(this.food.x + this.gridSize / 3, this.food.y + this.gridSize / 3, this.gridSize / 5, 0, Math.PI * 2);
     this.ctx.fill();
-    this.ctx.globalAlpha = 1;
-    this.ctx.restore();
+
+  }
+
+  // Helper function to adjust color brightness (simple version)
+  adjustColor(hex, lum) {
+    // Validate hex string
+    hex = String(hex).replace(/[^0-9a-f]/gi, '');
+    if (hex.length < 6) {
+      hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    }
+    lum = lum || 0;
+
+    // Convert to decimal and change luminosity
+    let rgb = "#", c, i;
+    for (i = 0; i < 3; i++) {
+      c = parseInt(hex.substr(i*2,2), 16);
+      c = Math.round(Math.min(Math.max(0, c + (c * lum / 100)), 255)).toString(16);
+      rgb += ("00"+c).substr(c.length);
+    }
+
+    // A simple way to darken/lighten: add lum to each component
+    let rgbAdjusted = "#";
+    for (i = 0; i < 3; i++) {
+      c = parseInt(hex.substr(i*2, 2), 16);
+      c = Math.round(Math.min(Math.max(0, c + lum), 255)).toString(16); // Add lum directly
+      rgbAdjusted += ("00" + c).substr(c.length);
+    }
+    return rgbAdjusted;
+  }
+
+  // Helper function to get color brightness (0-255)
+  getColorBrightness(hex) {
+    hex = String(hex).replace(/[^0-9a-f]/gi, '');
+    if (hex.length < 6) {
+      hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    }
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // Using standard luminance calculation
+    return (r * 299 + g * 587 + b * 114) / 1000;
   }
 
 
@@ -288,32 +321,90 @@ export class Game {
     const closeSettingsBtn = document.getElementById('close-settings');
     const speedSelectModal = document.getElementById('speed-select-modal');
     const showGridModal = document.getElementById('show-grid-modal');
+    const colorOptionsContainer = document.getElementById('color-options'); // Added
     const speedSelect = document.getElementById('speed-select');
     const gridCheckbox = document.getElementById('show-grid');
+
+    // Populate color options
+    if (colorOptionsContainer) {
+        colorOptionsContainer.innerHTML = ''; // Clear existing options
+        Object.entries(this.colorPalette).forEach(([name, color]) => {
+          const colorDiv = document.createElement('div');
+          colorDiv.classList.add('color-option');
+          colorDiv.style.backgroundColor = color;
+          colorDiv.dataset.color = color;
+          colorDiv.title = name; // Show color name on hover
+          if (color === this.snakeColor) {
+            colorDiv.classList.add('selected');
+          }
+          colorDiv.addEventListener('click', () => {
+            this.snakeColor = color;
+            // Update selection state visually
+            document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+            colorDiv.classList.add('selected');
+            // No need to apply immediately, will be applied on modal close or game restart
+          });
+          colorOptionsContainer.appendChild(colorDiv);
+        });
+    }
 
     // 兼容弹窗和主界面设置
     if (settingsBtn && settingsModal) {
       settingsBtn.onclick = () => {
-        this.wasPausedBeforeSettings = this.gamePaused; // Store current pause state
-        if (!this.gamePaused && !this.isGameOver) {
-          this.togglePause(true); // Pause game if running, mark as settings pause
-        }
-        settingsModal.style.display = 'flex';
-        if (speedSelectModal) speedSelectModal.value = Object.keys(this.speedMap).find(k => this.speedMap[k] === this.gameSpeed) || 'normal';
-        if (showGridModal) showGridModal.checked = this.showGrid;
+        this.openSettings(); // Call dedicated open settings method
       };
     }
 
     const closeModal = () => {
-        settingsModal.style.display = 'none';
-        // Resume game only if it was running before opening settings
-        if (!this.wasPausedBeforeSettings && this.gamePaused && !this.isGameOver) {
-            this.togglePause(true); // Resume game, mark as settings resume
-        }
+        this.closeSettings(); // Call dedicated close settings method
     };
 
     if (closeSettingsBtn && settingsModal) {
       closeSettingsBtn.onclick = closeModal;
+    }
+
+  }
+
+  // Separate methods for managing settings modal
+  openSettings() {
+    this.wasPausedBeforeSettings = this.gamePaused;
+    if (!this.gamePaused && !this.isGameOver) {
+      this.togglePause(true); // Pause game if running, mark as settings pause
+    }
+    const settingsModal = document.getElementById('settings-modal');
+    const speedSelectModal = document.getElementById('speed-select-modal');
+    const showGridModal = document.getElementById('show-grid-modal');
+    const colorOptionsContainer = document.getElementById('color-options');
+
+    // Reflect current settings in the modal
+    if (speedSelectModal) {
+        const currentSpeedKey = Object.keys(this.speedMap).find(key => this.speedMap[key] === this.gameSpeed) || 'normal';
+        speedSelectModal.value = currentSpeedKey;
+    }
+    if (showGridModal) {
+        showGridModal.checked = this.showGrid;
+    }
+    // Update color selection UI based on current snakeColor
+    if (colorOptionsContainer) {
+        document.querySelectorAll('.color-option').forEach(el => {
+            el.classList.toggle('selected', el.dataset.color === this.snakeColor);
+        });
+    }
+
+    if (settingsModal) settingsModal.style.display = 'flex';
+  }
+
+  closeSettings() {
+    const settingsModal = document.getElementById('settings-modal');
+    this.applySettings(); // Apply and save settings first
+    if (settingsModal) settingsModal.style.display = 'none';
+    // Resume game only if it was running before opening settings
+    if (!this.wasPausedBeforeSettings && this.gamePaused && !this.isGameOver) {
+      this.togglePause(true); // Resume game, mark as settings resume
+    }
+    // Redraw needed to show color/grid changes if game is paused or over
+    if (this.gamePaused || this.isGameOver) {
+        this.draw();
     }
     if (speedSelectModal) {
       speedSelectModal.onchange = (e) => {
@@ -342,17 +433,99 @@ export class Game {
         }
       });
     }
-    // 主界面设置
+    // 主界面设置 (These might be redundant if modal settings are preferred)
     if (speedSelect) {
       speedSelect.addEventListener('change', (e) => {
         this.setSpeed(e.target.value);
+        // Optionally update modal select if visible
+        if (speedSelectModal) speedSelectModal.value = e.target.value;
+        localStorage.setItem('snakeGameSpeed', e.target.value);
+        this.showSnackbar('速度已更改');
       });
     }
     if (gridCheckbox) {
       gridCheckbox.addEventListener('change', (e) => {
         this.setShowGrid(e.target.checked);
+        // Optionally update modal checkbox if visible
+        if (showGridModal) showGridModal.checked = e.target.checked;
+        localStorage.setItem('snakeShowGrid', e.target.checked);
+        this.showSnackbar(`网格已${e.target.checked ? '显示' : '隐藏'}`);
       });
     }
+  }
+
+  loadSettings() {
+    const savedSpeed = localStorage.getItem('snakeGameSpeed');
+    const savedShowGrid = localStorage.getItem('snakeShowGrid');
+    const savedColor = localStorage.getItem('snakeColor');
+
+    if (savedSpeed && this.speedMap[savedSpeed]) {
+      this.gameSpeed = this.speedMap[savedSpeed];
+      // Update UI elements if they exist
+      const speedSelect = document.getElementById('speed-select');
+      const speedSelectModal = document.getElementById('speed-select-modal');
+      if (speedSelect) speedSelect.value = savedSpeed;
+      if (speedSelectModal) speedSelectModal.value = savedSpeed;
+    }
+    // Default to true if not set
+    this.showGrid = savedShowGrid === null ? true : savedShowGrid === 'true';
+    // Update UI elements if they exist
+    const gridCheckbox = document.getElementById('show-grid');
+    const showGridModal = document.getElementById('show-grid-modal');
+    if (gridCheckbox) gridCheckbox.checked = this.showGrid;
+    if (showGridModal) showGridModal.checked = this.showGrid;
+
+    if (savedColor && Object.values(this.colorPalette).includes(savedColor)) {
+      this.snakeColor = savedColor;
+      // Update color selection UI in modal if it exists
+      const colorOptionsContainer = document.getElementById('color-options');
+      if (colorOptionsContainer) {
+          document.querySelectorAll('.color-option').forEach(el => {
+              el.classList.toggle('selected', el.dataset.color === this.snakeColor);
+          });
+      }
+    }
+  }
+
+  applySettings() {
+    const speedSelectModal = document.getElementById('speed-select-modal');
+    const showGridModal = document.getElementById('show-grid-modal');
+
+    // Apply speed from modal
+    if (speedSelectModal) {
+        const selectedSpeed = speedSelectModal.value;
+        if (this.speedMap[selectedSpeed]) {
+          this.gameSpeed = this.speedMap[selectedSpeed];
+          localStorage.setItem('snakeGameSpeed', selectedSpeed);
+          // Update main UI select as well
+          const speedSelect = document.getElementById('speed-select');
+          if (speedSelect) speedSelect.value = selectedSpeed;
+          // Restart interval with new speed if game is running
+          if (this.gameInterval && !this.gamePaused && !this.isGameOver) {
+            clearInterval(this.gameInterval);
+            this.gameInterval = setInterval(() => this.gameLoop(), this.gameSpeed);
+          }
+        }
+    }
+
+    // Apply grid visibility from modal
+    if (showGridModal) {
+        this.showGrid = showGridModal.checked;
+        localStorage.setItem('snakeShowGrid', this.showGrid);
+        // Update main UI checkbox as well
+        const gridCheckbox = document.getElementById('show-grid');
+        if (gridCheckbox) gridCheckbox.checked = this.showGrid;
+    }
+
+    // Apply color (already updated via click, just save)
+    localStorage.setItem('snakeColor', this.snakeColor);
+
+    // Redraw immediately to reflect grid changes
+    if (!this.isGameOver) {
+        this.draw();
+    }
+
+    this.showSnackbar('设置已保存');
   }
 
   start() {

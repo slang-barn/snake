@@ -299,3 +299,47 @@ canvas {
     height: 1.1em;
     margin-right: 3px;
 }
+
+.setting-item.color-setting {
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap; /* Allow wrapping if too many colors */
+}
+
+.color-setting label {
+  margin-right: 10px;
+  white-space: nowrap;
+}
+
+.color-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap; /* Allow wrapping */
+}
+
+.color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.1s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  display: flex; /* For centering checkmark */
+  align-items: center;
+  justify-content: center;
+}
+
+.color-option.selected {
+  border-color: #007aff; /* iOS blue for selection */
+  transform: scale(1.1);
+}
+
+/* Optional: Add a checkmark for the selected color */
+.color-option.selected::after {
+  content: '✔';
+  color: white;
+  font-size: 14px;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
